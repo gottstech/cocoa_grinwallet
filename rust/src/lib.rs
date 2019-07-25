@@ -36,7 +36,7 @@ use grin_wallet_libwallet::{NodeClient, WalletInst, SlateVersion, VersionedSlate
 use grin_wallet_util::grin_core::global::ChainTypes;
 use grin_wallet_util::grin_keychain::ExtKeychain;
 use grin_wallet_util::grin_util::{file::get_first_line, Mutex, ZeroingString};
-use grin_wallet_controller::grinrelay_listener;
+use grin_wallet_controller::{grinrelay_address, grinrelay_listener};
 
 /// Default minimum confirmation
 pub const MINIMUM_CONFIRMATIONS: u64 = 10;
@@ -543,6 +543,28 @@ pub extern "C" fn grin_listen(
     error: *mut u8,
 ) -> *const c_char {
     let res = listen(
+        &cstr_to_str(json_cfg),
+    );
+    unsafe { result_to_cstr(res, error) }
+}
+
+fn relay_addr(
+    json_cfg: &str,
+) -> Result<String, Error> {
+    let config = MobileWalletCfg::from_str(json_cfg)?;
+    let wallet = get_wallet_instance(config.clone())?;
+    Ok(grinrelay_address(
+        wallet.clone(),
+        config.grinrelay_config.clone().unwrap_or_default(),
+    )?)
+}
+
+#[no_mangle]
+pub extern "C" fn grin_relay_addr(
+    json_cfg: *const c_char,
+    error: *mut u8,
+) -> *const c_char {
+    let res = relay_addr(
         &cstr_to_str(json_cfg),
     );
     unsafe { result_to_cstr(res, error) }

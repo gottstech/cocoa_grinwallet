@@ -92,6 +92,11 @@ const char* grin_listen(
     uint8_t *error
 );
 
+const char* grin_relay_addr(
+    const char* json_cfg,
+    uint8_t *error
+);
+
 const char* grin_init_tx(
     const char* json_cfg,
     uint64_t amount,
