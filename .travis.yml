@@ -1,0 +1,86 @@
+# Copyright 2019 Gary Yu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+dist: trusty
+sudo: required
+language: rust
+rust:
+- stable
+git:
+  depth: false
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - g++-5
+    - cmake
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - libssl-dev
+    - cmake
+    - gcc
+    - binutils-dev
+
+cache:
+  cargo: true
+  timeout: 240
+  directories:
+  - "$HOME/.cargo" - "$TRAVIS_BUILD_DIR/rust/target"
+
+env:
+  global:
+  - RUST_BACKTRACE="1"
+  - RUSTFLAGS="-C debug-assertions"
+  - OPENSSL_DIR="/usr/local/opt/openssl"
+
+matrix:
+  include:
+  - os: osx
+    env: CI_JOB="test"        CI_JOB_ARGS="aarch64"
+  - os: osx
+    env: CI_JOB="test"        CI_JOB_ARGS="x86_64"
+  - os: osx
+    env: CI_JOB="test"        CI_JOB_ARGS="armv7s"
+  - os: osx
+    env: CI_JOB="release"     CI_JOB_ARGS="aarch64"
+  - os: osx
+    env: CI_JOB="release"     CI_JOB_ARGS="x86_64"
+  - os: osx
+    env: CI_JOB="release"     CI_JOB_ARGS="armv7s"
+
+before_script:
+- rustup target add aarch64-apple-ios x86_64-apple-ios armv7s-apple-ios
+- cargo install cargo-lipo || true
+
+script:
+- bash .ci/general-jobs
+
+before_cache:
+- rm -f cocoa_grinwallet/Library/*
+
+before_deploy:
+- bash .ci/release-jobs
+
+deploy:
+  provider: releases
+  api_key:
+    secure: a63wnAh8W6vxO0sHsaXxcdjNKvbGrh+9hGzulsv9EmIzZXBZqEfZRCIUhr0rC+ZdKC4Se4kROLcouxVaNKrmHaVRrmpSaN9OrglL0LvjhiiAwdMi0X1ZhKXQbUBLLtOpmCmgKpi80oLXdtCUqwlhC7/odUTL1jjCKMKg/LdSyQjoA4LHa14q4mt47Nb3dpYed3stTxTv1NG3wW8+oHN9udVPoy1Sbkr+YiQee3CLIjE7If7eKhKe3DGmA2ilvLjHmU3FibwYhVOn4W8RVm+EU5knBUCO3NkHJRsZi6MrGRumAfA/KpOyaPwFHVPy7/O5XRL+RJj8CNUlVyQEoBZQL1d7LOudYNHIedcXcEWt89p/5CT5dTAPi9ori7ULXtVfh2PYM0UjfNl9WNjI9okJ347ptIC2gGA5Ybf7MHPd8e0FqBLM6XCkP8BjNULSK6iur221khk3luk4Y96KvOQeWiw2fWVGF+p2C+dyMHo7rcsH3sx0Nj6KXF4QUntQl5Ny8u5646J5oFfPidRVB5AXyvvf8aNPaEa4yyI6rLk+n/ujh96P2ww91MKv/TEc1wTBvHcCIyYl2uG9RBe7z4ZVY8UakffSbG0hvdrjRTQ+qMTq6Tc8w8Fkv5uFuU9jsQWRtIYv025Hp0UQPhaIHY9kKvytX5hASwAdHyVvRV3SnKM=
+  file_glob: true
+  file: cocoa_grinwallet/Library/libgrinwallet*.*
+  skip_cleanup: true
+  on:
+    repo: gottstech/cocoa_grinwallet
+    tags: true

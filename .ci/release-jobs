@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# Copyright 2019 Gary Yu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script contains release-related jobs.
+
+# Redeclare CI and VCP specific environment variables
+# to make future migration to other providers easier.
+readonly JOB_ID="${TRAVIS_JOB_ID}"
+readonly OS_NAME="${TRAVIS_OS_NAME}"
+readonly TEST_RESULT="${TRAVIS_TEST_RESULT}"
+
+case "${CI_JOB}" in
+    "release")
+        # The release can only be triggered after successful completion of all tests.
+        [[ "${TEST_RESULT}" != 0 ]] && exit 1
+
+        readonly REPO_TAG="$(git describe --tags --exact-match 2> /dev/null || git symbolic-ref -q --short HEAD)"
+
+        cd rust && cargo clean && cargo lipo --release --targets ${CI_JOB_ARGS}-apple-ios && cd - > /dev/null || exit 1
+        readonly PKG_NAME="libgrinwallet_${CI_JOB_ARGS}-apple-ios"
+        readonly PKG_SUFFIX=".a"
+
+        printf "creating package \`%s\` for the release binary...\n" "${PKG_NAME}${PKG_SUFFIX}"
+
+        ls -l rust/target/${CI_JOB_ARGS}-apple-ios/release/libgrinwallet.a || exit 1
+        cp rust/target/${CI_JOB_ARGS}-apple-ios/release/libgrinwallet.a cocoa_grinwallet/Library/"${PKG_NAME}${PKG_SUFFIX}" || exit 1
+
+        cd cocoa_grinwallet/Library && shasum "${PKG_NAME}${PKG_SUFFIX}" > "${PKG_NAME}-shasum.txt" && cd - > /dev/null || exit 1
+
+        printf "%s package \`%s\` generated\n" "${OS_NAME}" "${PKG_NAME}${PKG_SUFFIX}"
+
+        ;;
+esac

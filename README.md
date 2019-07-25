@@ -1,3 +1,5 @@
+[![Build Status](https://img.shields.io/travis/gottstech/cocoa_grinwallet/master.svg)](https://travis-ci.org/gottstech/cocoa_grinwallet)
+
 # cocoa_grinwallet
 IOS Grin Wallet Pod
 
@@ -23,7 +25,7 @@ IOS Grin Wallet Pod
 ### Build the libs
 
 ```
-git clone --recursive --depth 1 https://github.com/gottstech/cocoa_grinwallet.git
+git clone --recursive https://github.com/gottstech/cocoa_grinwallet.git
 cd cocoa_grinwallet/rust
 export OPENSSL_DIR="/usr/local/opt/openssl"
 cargo lipo --release --targets aarch64-apple-ios,x86_64-apple-ios,armv7s-apple-ios
@@ -32,7 +34,6 @@ cargo lipo --release --targets aarch64-apple-ios,x86_64-apple-ios,armv7s-apple-i
 
 Note:
 - The generated libs are in `Library/` folder.
-- The `--depth 1` parameter of `git clone` is strongly proposed, to avoid downloading the big git history, since the three library files have about 100MB in git for each version with new libraries.
 - If don't have openssl installed, please run:
   - For Mac: `brew install openssl`
   - For Linux: `sudo apt install libssl-dev`

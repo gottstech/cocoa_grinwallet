@@ -1,6 +1,6 @@
 [package]
 name = "cocoa_grinwallet"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Gary Yu"]
 description = "Grin Wallet IOS Libs. With embedded Grin Relay service."
 publish = false
