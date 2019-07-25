@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'cocoa_grinwallet'
-  s.version          = '1.0.2'
+  s.version          = '1.0.3'
   s.summary          = 'Grin Wallet IOS Libs. With embedded Grin Relay service.'
 
 # This description is used to generate tags and improve search results.
