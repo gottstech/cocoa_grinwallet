@@ -8,7 +8,9 @@ IOS Grin Wallet Pod
 
 - Install Xcode build tools:
 
-`xcode-select --install`
+```Bash
+xcode-select --install
+```
 
 - Install Rust:
 
@@ -16,15 +18,19 @@ IOS Grin Wallet Pod
 
 - Add ios architectures to rustup:
 
-`rustup target add aarch64-apple-ios x86_64-apple-ios armv7s-apple-ios`
+```Bash
+rustup target add aarch64-apple-ios x86_64-apple-ios armv7s-apple-ios
+```
 
 - Install `cargo-lipo`, a cargo sub-command for creating iOS libs:
 
-`cargo install cargo-lipo`
+```Bash
+cargo install cargo-lipo
+```
 
 ### Build the libs
 
-```
+```Bash
 git clone --recursive https://github.com/gottstech/cocoa_grinwallet.git
 cd cocoa_grinwallet/rust
 export OPENSSL_DIR="/usr/local/opt/openssl"
@@ -37,6 +43,23 @@ Note:
 - If don't have openssl installed, please run:
   - For Mac: `brew install openssl`
   - For Linux: `sudo apt install libssl-dev`
+  
+### On IOS Application Side
+
+Add the following 2 lines into your `Podfile`:
+```Bash
+  pod 'cocoa_grinwallet', :git => 'https://github.com/gottstech/cocoa_grinwallet.git', :tag => 'v1.0.2'
+  pod 'OpenSSL', '~> 1.0'
+```
+then run `pod install`
+
+If you have problem for OpenSSL pod installation, please refer to [this post](https://stackoverflow.com/a/57196786/3831478) to solve it.  
+
+After the pod installation, remember to manually download the libraries to avoid a long building procedure. The libraries can be found in the [release](https://github.com/gottstech/cocoa_grinwallet/releases) page of this repo.
+
+```Bash
+to be completed...
+```
 
 ## License
 
