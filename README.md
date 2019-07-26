@@ -57,6 +57,9 @@ If you have problem for OpenSSL pod installation, please refer to [this post](ht
 
 After the pod installation, remember to manually download the libraries to avoid a long building procedure. The libraries can be found in the [release](https://github.com/gottstech/cocoa_grinwallet/releases) page of this repo.
 
+<details>
+ <summary>download script</summary>
+  
 ```Bash
 #!/bin/bash
 
@@ -75,6 +78,8 @@ printf "3 libs have been downloaded successfully\n"
 cd - > /dev/null || exit 1
 ls -l Pods/cocoa_grinwallet/cocoa_grinwallet/Library
 ```
+</details>
+
 
 ## Document
 
