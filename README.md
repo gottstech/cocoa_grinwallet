@@ -76,6 +76,10 @@ cd - > /dev/null || exit 1
 ls -l Pods/cocoa_grinwallet/cocoa_grinwallet/Library
 ```
 
+## Document
+
+https://github.com/gottstech/cocoa_grinwallet/wiki
+
 ## License
 
 Apache License v2.0.
