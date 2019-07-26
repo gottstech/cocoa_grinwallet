@@ -48,7 +48,7 @@ Note:
 
 Add the following 2 lines into your `Podfile`:
 ```Bash
-  pod 'cocoa_grinwallet', :git => 'https://github.com/gottstech/cocoa_grinwallet.git', :tag => 'v1.0.2'
+  pod 'cocoa_grinwallet', :git => 'https://github.com/gottstech/cocoa_grinwallet.git', :tag => 'v1.0.3'
   pod 'OpenSSL', '~> 1.0'
 ```
 then run `pod install`
