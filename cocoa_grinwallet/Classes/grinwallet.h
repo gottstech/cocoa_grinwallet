@@ -19,9 +19,21 @@
 
 void cstr_free(const char *s);
 
+const char*  select_nearest_node(
+    const char* check_node_api_http_addr,
+    uint8_t *error
+);
+
 const char*  grin_check_password(
     const char* json_cfg,
     const char* password,
+    uint8_t *error
+);
+
+const char*  grin_wallet_change_password(
+    const char* json_cfg,
+    const char* old_password,
+    const char* new_password,
     uint8_t *error
 );
 
@@ -92,8 +104,14 @@ const char* grin_listen(
     uint8_t *error
 );
 
-const char* grin_relay_addr(
+const char* my_grin_relay_addr(
     const char* json_cfg,
+    uint8_t *error
+);
+
+const char* grin_relay_addr_query(
+    const char* json_cfg,
+    const char* six_code_suffix,
     uint8_t *error
 );
 

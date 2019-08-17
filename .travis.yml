@@ -38,13 +38,13 @@ cache:
   cargo: true
   timeout: 240
   directories:
-  - "$HOME/.cargo" - "$TRAVIS_BUILD_DIR/rust/target"
+  - "$HOME/.cargo"
+  - "$TRAVIS_BUILD_DIR/rust/target"
 
 env:
   global:
   - RUST_BACKTRACE="1"
   - RUSTFLAGS="-C debug-assertions"
-  - OPENSSL_DIR="/usr/local/opt/openssl"
 
 matrix:
   include:
