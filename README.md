@@ -3,6 +3,39 @@
 # cocoa_grinwallet
 IOS Grin Wallet Pod
 
+## How to import this pod
+
+Add one line into your `Podfile`:
+```Bash
+  pod 'cocoa_grinwallet', :git => 'https://github.com/gottstech/cocoa_grinwallet.git', :tag => 'v1.0.4'
+```
+then run `pod install`
+
+After the pod installation, remember to manually download the libraries to avoid a long building procedure. The libraries can be found in the [release](https://github.com/gottstech/cocoa_grinwallet/releases) page of this repo.
+
+<details>
+ <summary>download script</summary>
+
+```Bash
+#!/bin/bash
+
+version=`grep " pod 'cocoa_grinwallet'" Podfile | sed "s/.*:tag => '\(.*\)'/\1/"`
+
+mkdir -p Pods/cocoa_grinwallet/cocoa_grinwallet/Library && cd Pods/cocoa_grinwallet/cocoa_grinwallet/Library && rm -f libgrinwallet* || exit 1
+
+wget https://github.com/gottstech/cocoa_grinwallet/releases/download/${version}/libgrinwallet_aarch64-apple-ios.a || exit 1
+
+wget https://github.com/gottstech/cocoa_grinwallet/releases/download/${version}/libgrinwallet_armv7s-apple-ios.a || exit 1
+
+wget https://github.com/gottstech/cocoa_grinwallet/releases/download/${version}/libgrinwallet_x86_64-apple-ios.a || exit 1
+
+printf "3 libs have been downloaded successfully\n"
+
+cd - > /dev/null || exit 1
+ls -l Pods/cocoa_grinwallet/cocoa_grinwallet/Library
+```
+</details>
+
 ## Build
 ### Set up the environment
 
@@ -33,56 +66,20 @@ cargo install cargo-lipo
 ```Bash
 git clone --recursive https://github.com/gottstech/cocoa_grinwallet.git
 cd cocoa_grinwallet/rust
-export OPENSSL_DIR="/usr/local/opt/openssl"
 cargo lipo --release --targets aarch64-apple-ios,x86_64-apple-ios,armv7s-apple-ios
 ./copy_libs.sh
 ```
 
 Note:
 - The generated libs are in `Library/` folder.
-- If don't have openssl installed, please run:
-  - For Mac: `brew install openssl`
-  - For Linux: `sudo apt install libssl-dev`
   
-### On IOS Application Side
-
-Add the following 2 lines into your `Podfile`:
-```Bash
-  pod 'cocoa_grinwallet', :git => 'https://github.com/gottstech/cocoa_grinwallet.git', :tag => 'v1.0.2'
-  pod 'OpenSSL', '~> 1.0'
-```
-then run `pod install`
-
-If you have problem for OpenSSL pod installation, please refer to [this post](https://stackoverflow.com/a/57196786/3831478) to solve it.  
-
-After the pod installation, remember to manually download the libraries to avoid a long building procedure. The libraries can be found in the [release](https://github.com/gottstech/cocoa_grinwallet/releases) page of this repo.
-
-```Bash
-#!/bin/bash
-
-version=`grep " pod 'cocoa_grinwallet'" Podfile | sed "s/.*:tag => '\(.*\)'/\1/"`
-
-mkdir -p Pods/cocoa_grinwallet/cocoa_grinwallet/Library && cd Pods/cocoa_grinwallet/cocoa_grinwallet/Library && rm -f libgrinwallet* || exit 1
-
-wget https://github.com/gottstech/cocoa_grinwallet/releases/download/${version}/libgrinwallet_aarch64-apple-ios.a || exit 1
-
-wget https://github.com/gottstech/cocoa_grinwallet/releases/download/${version}/libgrinwallet_armv7s-apple-ios.a || exit 1
-
-wget https://github.com/gottstech/cocoa_grinwallet/releases/download/${version}/libgrinwallet_x86_64-apple-ios.a || exit 1
-
-printf "3 libs have been downloaded successfully\n"
-
-cd - > /dev/null || exit 1
-ls -l Pods/cocoa_grinwallet/cocoa_grinwallet/Library
-```
-
 ## License
 
 Apache License v2.0.
 
 ## Credits
 
-The code was using the [Ironbelly](https://github.com/cyclefortytwo/ironbelly) as the reference.
+The code was using the [Ironbelly](https://github.com/cyclefortytwo/ironbelly) as the initial reference.
 
 The related code taken with thanks and respect, with license details in all derived source files.
 
