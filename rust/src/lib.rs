@@ -16,10 +16,10 @@
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::sync::mpsc::{channel, TryRecvError};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use std::sync::mpsc::{channel, TryRecvError};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -28,16 +28,16 @@ use uuid::Uuid;
 
 use grin_wallet_api::{Foreign, Owner};
 use grin_wallet_config::{GrinRelayConfig, WalletConfig};
+use grin_wallet_controller::{grinrelay_address, grinrelay_listener};
 use grin_wallet_impls::{
-    instantiate_wallet, Error, ErrorKind, FileWalletCommAdapter, HTTPNodeClient,
-    HTTPWalletCommAdapter, LMDBBackend, GrinrelayWalletCommAdapter, WalletSeed,
+    instantiate_wallet, Error, ErrorKind, FileWalletCommAdapter, GrinrelayWalletCommAdapter,
+    HTTPNodeClient, HTTPWalletCommAdapter, LMDBBackend, WalletSeed,
 };
 use grin_wallet_libwallet::api_impl::types::InitTxArgs;
-use grin_wallet_libwallet::{NodeClient, WalletInst, SlateVersion, VersionedSlate};
+use grin_wallet_libwallet::{NodeClient, SlateVersion, VersionedSlate, WalletInst};
 use grin_wallet_util::grin_core::global::ChainTypes;
 use grin_wallet_util::grin_keychain::ExtKeychain;
 use grin_wallet_util::grin_util::{Mutex, ZeroingString};
-use grin_wallet_controller::{grinrelay_address, grinrelay_listener};
 
 /// Default minimum confirmation
 pub const MINIMUM_CONFIRMATIONS: u64 = 10;
@@ -170,7 +170,13 @@ fn wallet_init(json_cfg: &str, password: &str, is_12_phrases: bool) -> Result<St
     let wallet_config = new_wallet_config(MobileWalletCfg::from_str(json_cfg)?)?;
     let node_api_secret = wallet_config.node_api_secret.clone();
     let seed_length = if is_12_phrases { 16 } else { 32 };
-    let seed = WalletSeed::init_file(&wallet_config.data_file_dir, seed_length, None, password, false)?;
+    let seed = WalletSeed::init_file(
+        &wallet_config.data_file_dir,
+        seed_length,
+        None,
+        password,
+        false,
+    )?;
     let node_client = HTTPNodeClient::new(&wallet_config.check_node_api_http_addr, node_api_secret);
     let _: LMDBBackend<HTTPNodeClient, ExtKeychain> =
         LMDBBackend::new(wallet_config, password, node_client)?;
@@ -184,14 +190,22 @@ pub extern "C" fn grin_wallet_init(
     is_12_phrases: bool,
     error: *mut u8,
 ) -> *const c_char {
-    let res = wallet_init(&cstr_to_str(json_cfg), &cstr_to_str(password), is_12_phrases);
+    let res = wallet_init(
+        &cstr_to_str(json_cfg),
+        &cstr_to_str(password),
+        is_12_phrases,
+    );
     unsafe { result_to_cstr(res, error) }
 }
 
 fn wallet_init_recover(json_cfg: &str, mnemonic: &str) -> Result<String, Error> {
     let config = MobileWalletCfg::from_str(json_cfg)?;
     let wallet_config = new_wallet_config(config.clone())?;
-    WalletSeed::recover_from_phrase(&wallet_config.data_file_dir, mnemonic, config.password.as_str())?;
+    WalletSeed::recover_from_phrase(
+        &wallet_config.data_file_dir,
+        mnemonic,
+        config.password.as_str(),
+    )?;
     let node_api_secret = wallet_config.node_api_secret.clone();
     let node_client = HTTPNodeClient::new(&wallet_config.check_node_api_http_addr, node_api_secret);
     let _: LMDBBackend<HTTPNodeClient, ExtKeychain> =
@@ -205,10 +219,7 @@ pub extern "C" fn grin_wallet_init_recover(
     mnemonic: *const c_char,
     error: *mut u8,
 ) -> *const c_char {
-    let res = wallet_init_recover(
-        &cstr_to_str(json_cfg),
-        &cstr_to_str(mnemonic),
-    );
+    let res = wallet_init_recover(&cstr_to_str(json_cfg), &cstr_to_str(mnemonic));
     unsafe { result_to_cstr(res, error) }
 }
 
@@ -240,16 +251,17 @@ pub extern "C" fn grin_wallet_change_password(
     unsafe { result_to_cstr(res, error) }
 }
 
-fn wallet_restore(
-    json_cfg: &str,
-    start_index: u64,
-    batch_size: u64,
-) -> Result<String, Error> {
+fn wallet_restore(json_cfg: &str, start_index: u64, batch_size: u64) -> Result<String, Error> {
     let config = MobileWalletCfg::from_str(json_cfg)?;
     let wallet_config = new_wallet_config(config.clone())?;
     let node_api_secret = wallet_config.node_api_secret.clone();
     let node_client = HTTPNodeClient::new(&wallet_config.check_node_api_http_addr, node_api_secret);
-    let wallet = instantiate_wallet(wallet_config, node_client, config.password.as_str(), &config.account)?;
+    let wallet = instantiate_wallet(
+        wallet_config,
+        node_client,
+        config.password.as_str(),
+        &config.account,
+    )?;
     let api = Owner::new(wallet.clone());
 
     let (highest_index, last_retrieved_index, num_of_found) = api
@@ -270,11 +282,7 @@ pub extern "C" fn grin_wallet_restore(
     batch_size: u64,
     error: *mut u8,
 ) -> *const c_char {
-    let res = wallet_restore(
-        &cstr_to_str(json_cfg),
-        start_index,
-        batch_size,
-    );
+    let res = wallet_restore(&cstr_to_str(json_cfg), start_index, batch_size);
     unsafe { result_to_cstr(res, error) }
 }
 
@@ -353,10 +361,7 @@ fn get_balance(json_cfg: &str) -> Result<(bool, String), Error> {
 }
 
 #[no_mangle]
-pub extern "C" fn grin_get_balance(
-    json_cfg: *const c_char,
-    error: *mut u8,
-) -> *const c_char {
+pub extern "C" fn grin_get_balance(json_cfg: *const c_char, error: *mut u8) -> *const c_char {
     let res = get_balance(&cstr_to_str(json_cfg));
     unsafe { result2_to_cstr(res, error) }
 }
@@ -375,10 +380,7 @@ pub extern "C" fn grin_tx_retrieve(
     tx_slate_id: *const c_char,
     error: *mut u8,
 ) -> *const c_char {
-    let res = tx_retrieve(
-        &cstr_to_str(json_cfg),
-        &cstr_to_str(tx_slate_id),
-    );
+    let res = tx_retrieve(&cstr_to_str(json_cfg), &cstr_to_str(tx_slate_id));
     unsafe { result_to_cstr(res, error) }
 }
 
@@ -393,10 +395,7 @@ fn txs_retrieve(json_cfg: &str) -> Result<String, Error> {
 }
 
 #[no_mangle]
-pub extern "C" fn grin_txs_retrieve(
-    state_json: *const c_char,
-    error: *mut u8,
-) -> *const c_char {
+pub extern "C" fn grin_txs_retrieve(state_json: *const c_char, error: *mut u8) -> *const c_char {
     let res = txs_retrieve(&cstr_to_str(state_json));
     unsafe { result_to_cstr(res, error) }
 }
@@ -419,10 +418,7 @@ pub extern "C" fn grin_output_retrieve(
 }
 
 #[no_mangle]
-pub extern "C" fn grin_outputs_retrieve(
-    json_cfg: *const c_char,
-    error: *mut u8,
-) -> *const c_char {
+pub extern "C" fn grin_outputs_retrieve(json_cfg: *const c_char, error: *mut u8) -> *const c_char {
     let res = outputs_retrieve(&cstr_to_str(json_cfg), None);
     unsafe { result_to_cstr(res, error) }
 }
@@ -477,9 +473,7 @@ pub extern "C" fn grin_init_tx(
     unsafe { result_to_cstr(res, error) }
 }
 
-fn listen(
-    json_cfg: &str,
-) -> Result<String, Error> {
+fn listen(json_cfg: &str) -> Result<String, Error> {
     let config = MobileWalletCfg::from_str(json_cfg)?;
     let wallet = get_wallet_instance(config.clone())?;
 
@@ -502,26 +496,32 @@ fn listen(
                 Ok((addr, slate)) => {
                     let _slate_id = slate.id;
                     if api.verify_slate_messages(&slate).is_ok() {
-                        let slate_rx = api.receive_tx(&slate, Some(&config.account), None, Some(grinrelay_key_path));
+                        let slate_rx = api.receive_tx(
+                            &slate,
+                            Some(&config.account),
+                            None,
+                            Some(grinrelay_key_path),
+                        );
                         if let Ok(slate_rx) = slate_rx {
                             let versioned_slate =
                                 VersionedSlate::into_version(slate_rx.clone(), SlateVersion::V2);
-                            let res = grinrelay_listener.publish(&versioned_slate, &addr.to_owned());
+                            let res =
+                                grinrelay_listener.publish(&versioned_slate, &addr.to_owned());
                             match res {
                                 Ok(_) => {
-//                                    info!(
-//                                        "Slate [{}] sent back to {} successfully",
-//                                        slate_id.to_string().bright_green(),
-//                                        addr.bright_green(),
-//                                    );
+                                    //                                    info!(
+                                    //                                        "Slate [{}] sent back to {} successfully",
+                                    //                                        slate_id.to_string().bright_green(),
+                                    //                                        addr.bright_green(),
+                                    //                                    );
                                 }
                                 Err(_e) => {
-//                                    error!(
-//                                        "Slate [{}] fail to sent back to {} for {}",
-//                                        slate_id.to_string().bright_green(),
-//                                        addr.bright_green(),
-//                                        e,
-//                                    );
+                                    //                                    error!(
+                                    //                                        "Slate [{}] fail to sent back to {} for {}",
+                                    //                                        slate_id.to_string().bright_green(),
+                                    //                                        addr.bright_green(),
+                                    //                                        e,
+                                    //                                    );
                                 }
                             }
                         }
@@ -534,26 +534,19 @@ fn listen(
         }
     });
 
-//    if handle.is_err() {
-//        Err(ErrorKind::GenericError("Listen thread fail to start".to_string()).into())?
-//    }
+    //    if handle.is_err() {
+    //        Err(ErrorKind::GenericError("Listen thread fail to start".to_string()).into())?
+    //    }
     Ok("OK".to_owned())
 }
 
 #[no_mangle]
-pub extern "C" fn grin_listen(
-    json_cfg: *const c_char,
-    error: *mut u8,
-) -> *const c_char {
-    let res = listen(
-        &cstr_to_str(json_cfg),
-    );
+pub extern "C" fn grin_listen(json_cfg: *const c_char, error: *mut u8) -> *const c_char {
+    let res = listen(&cstr_to_str(json_cfg));
     unsafe { result_to_cstr(res, error) }
 }
 
-fn my_relay_addr(
-    json_cfg: &str,
-) -> Result<String, Error> {
+fn my_relay_addr(json_cfg: &str) -> Result<String, Error> {
     let config = MobileWalletCfg::from_str(json_cfg)?;
     let wallet = get_wallet_instance(config.clone())?;
     Ok(grinrelay_address(
@@ -563,20 +556,12 @@ fn my_relay_addr(
 }
 
 #[no_mangle]
-pub extern "C" fn my_grin_relay_addr(
-    json_cfg: *const c_char,
-    error: *mut u8,
-) -> *const c_char {
-    let res = my_relay_addr(
-        &cstr_to_str(json_cfg),
-    );
+pub extern "C" fn my_grin_relay_addr(json_cfg: *const c_char, error: *mut u8) -> *const c_char {
+    let res = my_relay_addr(&cstr_to_str(json_cfg));
     unsafe { result_to_cstr(res, error) }
 }
 
-fn relay_addr_query(
-    json_cfg: &str,
-    six_code_suffix: &str,
-) -> Result<String, Error> {
+fn relay_addr_query(json_cfg: &str, six_code_suffix: &str) -> Result<String, Error> {
     let mut is_valid_six_code = false;
     if six_code_suffix.len() == 6 {
         let re = Regex::new(r"[02-9ac-hj-np-z]{6}").unwrap();
@@ -610,7 +595,11 @@ fn relay_addr_query(
             thread::sleep(Duration::from_millis(100));
             wait_time += 1;
             if wait_time > 50 {
-                return Err(ErrorKind::GenericError("Fail to connect with grin relay service, 5s timeout. please try again later".to_owned()).into());
+                return Err(ErrorKind::GenericError(
+                    "Fail to connect with grin relay service, 5s timeout. please try again later"
+                        .to_owned(),
+                )
+                .into());
             }
         }
 
@@ -618,7 +607,10 @@ fn relay_addr_query(
         {
             let abbr = six_code_suffix.clone();
             if listener.retrieve_relay_addr(abbr.to_string()).is_err() {
-                return Err(ErrorKind::GenericError("Fail to send query request for abbreviated relay addr!".to_owned()).into());
+                return Err(ErrorKind::GenericError(
+                    "Fail to send query request for abbreviated relay addr!".to_owned(),
+                )
+                .into());
             }
 
             const TTL: u16 = 10;
@@ -637,14 +629,15 @@ fn relay_addr_query(
                 }
                 cnt += 1;
                 if cnt > TTL * 10 {
-//                    info!(
-//                        "{} from relay server for address query. {}s timeout",
-//                        "No response".bright_blue(),
-//                        TTL
-//                    );
+                    //                    info!(
+                    //                        "{} from relay server for address query. {}s timeout",
+                    //                        "No response".bright_blue(),
+                    //                        TTL
+                    //                    );
                     return Err(ErrorKind::GenericError(
-                        "relay server no response, please try again later".to_owned()).into()
-                    );
+                        "relay server no response, please try again later".to_owned(),
+                    )
+                    .into());
                 }
                 thread::sleep(Duration::from_millis(100));
             }
@@ -653,28 +646,31 @@ fn relay_addr_query(
                 match addresses.len() {
                     0 => {
                         return Err(ErrorKind::ArgumentError(
-                            "wrong address, or destination is offline".to_owned()).into()
-                        );
+                            "wrong address, or destination is offline".to_owned(),
+                        )
+                        .into());
                     }
                     1 => {
                         let dest = addresses.first().unwrap().clone();
                         return Ok(dest);
                     }
                     _ => {
-//                        warn!(
-//                            "{} addresses matched the same abbreviation address: {:?}",
-//                            addresses.len(),
-//                            addresses,
-//                        );
+                        //                        warn!(
+                        //                            "{} addresses matched the same abbreviation address: {:?}",
+                        //                            addresses.len(),
+                        //                            addresses,
+                        //                        );
                         return Err(ErrorKind::ArgumentError(
-                            "address conflict, multiple matched addresses found".to_owned()).into()
-                        );
+                            "address conflict, multiple matched addresses found".to_owned(),
+                        )
+                        .into());
                     }
                 }
             } else {
                 return Err(ErrorKind::ArgumentError(
-                    "wrong address, or destination is offline".to_owned()).into()
-                );
+                    "wrong address, or destination is offline".to_owned(),
+                )
+                .into());
             }
         }
     }
@@ -686,10 +682,7 @@ pub extern "C" fn grin_relay_addr_query(
     six_code_suffix: *const c_char,
     error: *mut u8,
 ) -> *const c_char {
-    let res = relay_addr_query(
-        &cstr_to_str(json_cfg),
-        &cstr_to_str(six_code_suffix),
-    );
+    let res = relay_addr_query(&cstr_to_str(json_cfg), &cstr_to_str(six_code_suffix));
     unsafe { result_to_cstr(res, error) }
 }
 
@@ -884,25 +877,23 @@ pub extern "C" fn grin_post_tx(
     tx_slate_id: *const c_char,
     error: *mut u8,
 ) -> *const c_char {
-    let res = post_tx(
-        &cstr_to_str(json_cfg),
-        &cstr_to_str(tx_slate_id),
-    );
+    let res = post_tx(&cstr_to_str(json_cfg), &cstr_to_str(tx_slate_id));
     unsafe { result_to_cstr(res, error) }
 }
 
-fn tx_file_receive(
-    json_cfg: &str,
-    slate_file_path: &str,
-    message: &str,
-) -> Result<String, Error> {
+fn tx_file_receive(json_cfg: &str, slate_file_path: &str, message: &str) -> Result<String, Error> {
     let config = MobileWalletCfg::from_str(json_cfg)?;
     let wallet = get_wallet_instance(config.clone())?;
     let api = Foreign::new(wallet, None);
     let adapter = FileWalletCommAdapter::new();
     let mut slate = adapter.receive_tx_async(&slate_file_path)?;
     api.verify_slate_messages(&slate)?;
-    slate = api.receive_tx(&slate, Some(&config.account), Some(message.to_string()), None)?;
+    slate = api.receive_tx(
+        &slate,
+        Some(&config.account),
+        Some(message.to_string()),
+        None,
+    )?;
     Ok(serde_json::to_string(&slate).expect("fail to serialize slate to json string"))
 }
 
@@ -921,10 +912,7 @@ pub extern "C" fn grin_tx_file_receive(
     unsafe { result_to_cstr(res, error) }
 }
 
-fn tx_file_finalize(
-    json_cfg: &str,
-    slate_file_path: &str,
-) -> Result<String, Error> {
+fn tx_file_finalize(json_cfg: &str, slate_file_path: &str) -> Result<String, Error> {
     let wallet = get_wallet_instance(MobileWalletCfg::from_str(json_cfg)?)?;
     let api = Owner::new(wallet);
     let adapter = FileWalletCommAdapter::new();
@@ -940,10 +928,7 @@ pub extern "C" fn grin_tx_file_finalize(
     slate_file_path: *const c_char,
     error: *mut u8,
 ) -> *const c_char {
-    let res = tx_file_finalize(
-        &cstr_to_str(json_cfg),
-        &cstr_to_str(slate_file_path),
-    );
+    let res = tx_file_finalize(&cstr_to_str(json_cfg), &cstr_to_str(slate_file_path));
     unsafe { result_to_cstr(res, error) }
 }
 
@@ -955,10 +940,7 @@ fn chain_height(json_cfg: &str) -> Result<String, Error> {
 }
 
 #[no_mangle]
-pub extern "C" fn grin_chain_height(
-    json_cfg: *const c_char,
-    error: *mut u8,
-) -> *const c_char {
+pub extern "C" fn grin_chain_height(json_cfg: *const c_char, error: *mut u8) -> *const c_char {
     let res = chain_height(&cstr_to_str(json_cfg));
     unsafe { result_to_cstr(res, error) }
 }
