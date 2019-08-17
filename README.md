@@ -71,8 +71,16 @@ cargo lipo --release --targets aarch64-apple-ios,x86_64-apple-ios,armv7s-apple-i
 ```
 
 Note:
-- The generated libs are in `Library/` folder.
-  
+- The generated libs are in `Library/` folder.  
+
+## Document
+
+https://github.com/gottstech/cocoa_grinwallet/wiki
+
+- [[Grin Wallet Cocoa API Guide|Grin-Wallet-Cocoa-API-Guide]]
+- [Wallet Address Specification](https://github.com/gigglewallet/grinrelay/wiki/Bech32-Grin-Relay-Address)
+- [Wallet Transaction Security on Grin Relay](https://github.com/gigglewallet/grinrelay/wiki/GrinRelay-Security-Specification)
+
 ## License
 
 Apache License v2.0.
