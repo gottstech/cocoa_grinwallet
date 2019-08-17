@@ -25,6 +25,13 @@ const char*  grin_check_password(
     uint8_t *error
 );
 
+const char*  grin_wallet_change_password(
+    const char* json_cfg,
+    const char* old_password,
+    const char* new_password,
+    uint8_t *error
+);
+
 const char* grin_init_wallet_seed(uint8_t *error);
 
 const char* grin_wallet_init(
@@ -92,8 +99,14 @@ const char* grin_listen(
     uint8_t *error
 );
 
-const char* grin_relay_addr(
+const char* my_grin_relay_addr(
     const char* json_cfg,
+    uint8_t *error
+);
+
+const char* grin_relay_addr_query(
+    const char* json_cfg,
+    const char* six_code_suffix,
     uint8_t *error
 );
 

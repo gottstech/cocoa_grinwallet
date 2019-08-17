@@ -21,6 +21,7 @@ use std::thread;
 use std::time::Duration;
 use std::sync::mpsc::{channel, TryRecvError};
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -550,7 +551,7 @@ pub extern "C" fn grin_listen(
     unsafe { result_to_cstr(res, error) }
 }
 
-fn relay_addr(
+fn my_relay_addr(
     json_cfg: &str,
 ) -> Result<String, Error> {
     let config = MobileWalletCfg::from_str(json_cfg)?;
@@ -562,12 +563,132 @@ fn relay_addr(
 }
 
 #[no_mangle]
-pub extern "C" fn grin_relay_addr(
+pub extern "C" fn my_grin_relay_addr(
     json_cfg: *const c_char,
     error: *mut u8,
 ) -> *const c_char {
-    let res = relay_addr(
+    let res = my_relay_addr(
         &cstr_to_str(json_cfg),
+    );
+    unsafe { result_to_cstr(res, error) }
+}
+
+fn relay_addr_query(
+    json_cfg: &str,
+    six_code_suffix: &str,
+) -> Result<String, Error> {
+    let mut is_valid_six_code = false;
+    if six_code_suffix.len() == 6 {
+        let re = Regex::new(r"[02-9ac-hj-np-z]{6}").unwrap();
+        let captures = re.captures(six_code_suffix);
+        if captures.is_some() {
+            is_valid_six_code = true;
+        }
+    }
+    if !is_valid_six_code {
+        return Err(ErrorKind::GenericError("invalid 6-code address".to_owned()).into());
+    }
+
+    let config = MobileWalletCfg::from_str(json_cfg)?;
+    let wallet = get_wallet_instance(config.clone())?;
+
+    {
+        let (relay_addr_query_sender, relay_addr_query_rx) = channel();
+
+        // Start a Grin Relay service firstly
+        let (_key_path, listener) = grinrelay_listener(
+            wallet.clone(),
+            config.grinrelay_config.clone().unwrap_or_default(),
+            None,
+            None,
+            Some(relay_addr_query_sender),
+        )?;
+
+        // Wait for connecting with relay service
+        let mut wait_time = 0;
+        while !listener.is_connected() {
+            thread::sleep(Duration::from_millis(100));
+            wait_time += 1;
+            if wait_time > 50 {
+                return Err(ErrorKind::GenericError("Fail to connect with grin relay service, 5s timeout. please try again later".to_owned()).into());
+            }
+        }
+
+        // Conversion the 6-code abbreviation address to the full address
+        {
+            let abbr = six_code_suffix.clone();
+            if listener.retrieve_relay_addr(abbr.to_string()).is_err() {
+                return Err(ErrorKind::GenericError("Fail to send query request for abbreviated relay addr!".to_owned()).into());
+            }
+
+            const TTL: u16 = 10;
+            let mut addresses: Option<Vec<String>> = None;
+            let mut cnt = 0;
+            loop {
+                match relay_addr_query_rx.try_recv() {
+                    Ok((_abbr, addrs)) => {
+                        if !addrs.is_empty() {
+                            addresses = Some(addrs);
+                        }
+                        break;
+                    }
+                    Err(TryRecvError::Disconnected) => break,
+                    Err(TryRecvError::Empty) => {}
+                }
+                cnt += 1;
+                if cnt > TTL * 10 {
+//                    info!(
+//                        "{} from relay server for address query. {}s timeout",
+//                        "No response".bright_blue(),
+//                        TTL
+//                    );
+                    return Err(ErrorKind::GenericError(
+                        "relay server no response, please try again later".to_owned()).into()
+                    );
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+
+            if let Some(addresses) = addresses {
+                match addresses.len() {
+                    0 => {
+                        return Err(ErrorKind::ArgumentError(
+                            "wrong address, or destination is offline".to_owned()).into()
+                        );
+                    }
+                    1 => {
+                        let dest = addresses.first().unwrap().clone();
+                        return Ok(dest);
+                    }
+                    _ => {
+//                        warn!(
+//                            "{} addresses matched the same abbreviation address: {:?}",
+//                            addresses.len(),
+//                            addresses,
+//                        );
+                        return Err(ErrorKind::ArgumentError(
+                            "address conflict, multiple matched addresses found".to_owned()).into()
+                        );
+                    }
+                }
+            } else {
+                return Err(ErrorKind::ArgumentError(
+                    "wrong address, or destination is offline".to_owned()).into()
+                );
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn grin_relay_addr_query(
+    json_cfg: *const c_char,
+    six_code_suffix: *const c_char,
+    error: *mut u8,
+) -> *const c_char {
+    let res = relay_addr_query(
+        &cstr_to_str(json_cfg),
+        &cstr_to_str(six_code_suffix),
     );
     unsafe { result_to_cstr(res, error) }
 }

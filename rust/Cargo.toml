@@ -15,6 +15,7 @@ failure_derive = "0.1"
 linefeed = "0.6"
 log = "0.4"
 prettytable-rs = "0.7"
+regex = "1"
 rpassword = "2.0.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1"
