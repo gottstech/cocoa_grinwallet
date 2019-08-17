@@ -27,7 +27,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use grin_wallet_api::{Foreign, Owner};
-use grin_wallet_config::{GrinRelayConfig, WalletConfig};
+use grin_wallet_config::{self, GrinRelayConfig, WalletConfig};
 use grin_wallet_controller::{grinrelay_address, grinrelay_listener};
 use grin_wallet_impls::{
     instantiate_wallet, Error, ErrorKind, FileWalletCommAdapter, GrinrelayWalletCommAdapter,
@@ -138,6 +138,33 @@ fn new_wallet_config(config: MobileWalletCfg) -> Result<WalletConfig, Error> {
         keybase_notify_ttl: Some(1440),
         grinrelay_config: Some(config.grinrelay_config.clone().unwrap_or_default()),
     })
+}
+
+fn select_node_server(check_node_api_http_addr: &str) -> Result<String, Error> {
+    // Select nearest node server
+    if check_node_api_http_addr
+        .starts_with("https://nodes.grin.icu")
+    {
+        match grin_wallet_config::select_node_server(check_node_api_http_addr) {
+            Ok(best) => {
+                return Ok(best);
+            }
+            Err(e) => {
+                // error!("select_node_server fail on {}", e);
+                return Err(ErrorKind::GenericError(e.to_string()).into());
+            }
+        }
+    }
+    Ok(check_node_api_http_addr.to_owned())
+}
+
+#[no_mangle]
+pub extern "C" fn select_nearest_node(
+    check_node_api_http_addr: *const c_char,
+    error: *mut u8,
+) -> *const c_char {
+    let res = select_node_server(&cstr_to_str(check_node_api_http_addr));
+    unsafe { result_to_cstr(res, error) }
 }
 
 fn check_password(json_cfg: &str, password: &str) -> Result<String, Error> {

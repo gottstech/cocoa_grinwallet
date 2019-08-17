@@ -19,6 +19,11 @@
 
 void cstr_free(const char *s);
 
+const char*  select_nearest_node(
+    const char* check_node_api_http_addr,
+    uint8_t *error
+);
+
 const char*  grin_check_password(
     const char* json_cfg,
     const char* password,
