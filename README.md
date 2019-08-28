@@ -87,7 +87,7 @@ Apache License v2.0.
 
 ## Credits
 
-The code was using the [Ironbelly](https://github.com/cyclefortytwo/ironbelly) as the initial reference.
+The code use the [Ironbelly](https://github.com/cyclefortytwo/ironbelly) as the initial reference.
 
 The related code taken with thanks and respect, with license details in all derived source files.
 
