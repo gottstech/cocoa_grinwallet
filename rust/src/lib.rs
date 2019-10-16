@@ -368,7 +368,7 @@ pub extern "C" fn grin_get_wallet_mnemonic(
 
 fn get_wallet_instance(
     config: MobileWalletCfg,
-) -> Result<Arc<Mutex<WalletInst<impl NodeClient, ExtKeychain>>>, Error> {
+) -> Result<Arc<Mutex<dyn WalletInst<impl NodeClient, ExtKeychain>>>, Error> {
     let wallet_config = new_wallet_config(config.clone())?;
     let node_api_secret = wallet_config.node_api_secret.clone();
     let node_client = HTTPNodeClient::new(&wallet_config.check_node_api_http_addr, node_api_secret);
@@ -749,13 +749,27 @@ fn send_tx_by_http(
     }
     let finalized_slate = finalized_slate?;
 
-    let res = api.post_tx(&finalized_slate.tx, false);
-    if res.is_err() {
-        api.cancel_tx(None, Some(slate_r1.id))?;
-        res?;
-    }
+    let res = api.post_tx(Some(finalized_slate.id), &finalized_slate.tx, true);
+    match res {
+        Ok(_) => {
+            //info!("Tx sent ok",);
+            return Ok(serde_json::to_string(&finalized_slate).expect("fail to serialize slate to json string"));
+        }
+        Err(e) => {
+            // re-post last unconfirmed txs and try again
+            if let Ok(true) = api.repost_last_txs(true, false) {
+                // iff one re-post success, post this transaction again
+                if let Ok(_) = api.post_tx(Some(finalized_slate.id), &finalized_slate.tx, true) {
+                    //info!("Tx sent ok (with last unconfirmed tx/s re-post)");
+                    return Ok(serde_json::to_string(&finalized_slate).expect("fail to serialize slate to json string"));
+                }
+            }
 
-    Ok(serde_json::to_string(&finalized_slate).expect("fail to serialize slate to json string"))
+            //error!("Tx sent fail on post.");
+            let _ = api.cancel_tx(None, Some(finalized_slate.id));
+            return Err(ErrorKind::GenericError(e.to_string()).into());
+        }
+    }
 }
 
 fn send_tx_by_relay(
@@ -794,7 +808,19 @@ fn send_tx_by_relay(
         None,
         None,
     )?;
-    thread::sleep(Duration::from_millis(1_000));
+    // Wait for connecting with relay service
+    let mut wait_time = 0;
+    while !grinrelay_listener.is_connected() {
+        thread::sleep(Duration::from_millis(100));
+        wait_time += 1;
+        if wait_time > 50 {
+            return Err(ErrorKind::GenericError(
+                "Fail to connect with grin relay service, 5s timeout. please try again later"
+                    .to_owned(),
+            )
+                .into());
+        }
+    }
 
     let adapter = GrinrelayWalletCommAdapter::new(grinrelay_listener, relay_rx);
     let (slate, tx_proof) = adapter.send_tx_sync(receiver_addr, &slate_r1.clone())?;
@@ -807,13 +833,27 @@ fn send_tx_by_relay(
     }
     let finalized_slate = finalized_slate?;
 
-    let res = api.post_tx(&finalized_slate.tx, false);
-    if res.is_err() {
-        api.cancel_tx(None, Some(slate_r1.id))?;
-        res?;
-    }
+    let res = api.post_tx(Some(finalized_slate.id), &finalized_slate.tx, true);
+    match res {
+        Ok(_) => {
+            //info!("Tx sent ok",);
+            return Ok(serde_json::to_string(&finalized_slate).expect("fail to serialize slate to json string"));
+        }
+        Err(e) => {
+            // re-post last unconfirmed txs and try again
+            if let Ok(true) = api.repost_last_txs(true, false) {
+                // iff one re-post success, post this transaction again
+                if let Ok(_) = api.post_tx(Some(finalized_slate.id), &finalized_slate.tx, true) {
+                    //info!("Tx sent ok (with last unconfirmed tx/s re-post)");
+                    return Ok(serde_json::to_string(&finalized_slate).expect("fail to serialize slate to json string"));
+                }
+            }
 
-    Ok(serde_json::to_string(&finalized_slate).expect("fail to serialize slate to json string"))
+            //error!("Tx sent fail on post.");
+            let _ = api.cancel_tx(None, Some(finalized_slate.id));
+            return Err(ErrorKind::GenericError(e.to_string()).into());
+        }
+    }
 }
 
 #[no_mangle]
@@ -890,7 +930,7 @@ fn post_tx(json_cfg: &str, tx_slate_id: &str) -> Result<String, Error> {
     let stored_tx = api.get_stored_tx(&txs[0])?;
     match stored_tx {
         Some(stored_tx) => {
-            api.post_tx(&stored_tx, false)?;
+            api.post_tx(Some(uuid), &stored_tx, true)?;
             Ok("OK".to_owned())
         }
         None => Err(Error::from(ErrorKind::GenericError(format!(
