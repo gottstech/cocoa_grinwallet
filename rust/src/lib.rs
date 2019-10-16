@@ -40,8 +40,11 @@ use grin_wallet_util::grin_core::global::ChainTypes;
 use grin_wallet_util::grin_keychain::ExtKeychain;
 use grin_wallet_util::grin_util::{Mutex, ZeroingString};
 
-/// Default minimum confirmation
+/// Default balance minimum confirmation
 pub const MINIMUM_CONFIRMATIONS: u64 = 10;
+
+/// Default sending coins selection minimum confirmation
+pub const SENDING_MINIMUM_CONFIRMATIONS: u64 = 0;
 
 fn cstr_to_str(s: *const c_char) -> String {
     unsafe { CStr::from_ptr(s).to_string_lossy().into_owned() }
@@ -463,7 +466,7 @@ fn init_send_tx(
     let tx_args = InitTxArgs {
         src_acct_name: None,
         amount,
-        minimum_confirmations: MINIMUM_CONFIRMATIONS,
+        minimum_confirmations: SENDING_MINIMUM_CONFIRMATIONS,
         max_outputs: 500,
         num_change_outputs: 1,
         selection_strategy: selection_strategy.to_string(),
@@ -727,7 +730,7 @@ fn send_tx_by_http(
     let args = InitTxArgs {
         src_acct_name: None,
         amount,
-        minimum_confirmations: MINIMUM_CONFIRMATIONS,
+        minimum_confirmations: SENDING_MINIMUM_CONFIRMATIONS,
         max_outputs: 500,
         num_change_outputs: 1,
         selection_strategy: selection_strategy.to_string(),
@@ -772,7 +775,7 @@ fn send_tx_by_relay(
     let args = InitTxArgs {
         src_acct_name: None,
         amount,
-        minimum_confirmations: MINIMUM_CONFIRMATIONS,
+        minimum_confirmations: SENDING_MINIMUM_CONFIRMATIONS,
         max_outputs: 500,
         num_change_outputs: 1,
         selection_strategy: selection_strategy.to_string(),
